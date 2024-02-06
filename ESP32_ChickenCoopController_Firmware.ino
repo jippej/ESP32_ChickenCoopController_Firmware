@@ -1,13 +1,3 @@
-
-/*
-  Uses libraries and example code from ArDewpoint Ardunio based ventilation system under BSD License ( Author Michael Niemi. https://urldefense.proofpoint.com/v2/url?u=https-3A__github.com_mvniemi&d=DwIGaQ&c=Qznq1V5e4u04CfMRj920aPtDqN4RUEToMeZ6oK6t9iY&r=252_MRi3ygNlE59oTPrit4zJLEUvc2St2grwJ8AKdYY&m=edow_P6JMKI4yvio5AWbdg7zEQ8A_vByl07OKu_55_Y&s=4xq6x6_EGhFSizIcnB1MilF71gbkyjB_kLf1enRckug&e=  )
-  
-  Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, but not to use it commercially for profit making or to sub-license and/or to sell copies of the Software or to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-   The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-
 //################# LIBRARIES ################
 
 #include <WebServer_WT32_ETH01.h>                                                         // Standard ESP32 Arduino library used for MQTT
@@ -16,7 +6,7 @@
 #include <SPI.h>                                                                          // Standard ESP32 Arduino library for SPI bus
 #include <Time.h>                                                                         // Standard ESP32 Arduino library
 #include <TimeAlarms.h>                                                                   // Standard ESP32 Arduino library
-#include "MCP23S08.h"                                                                     // library from https://github.com/julianschuler/MCP23S08
+#include "MCP23S08.h"                                                                     // library from https://urldefense.com/v3/__https://github.com/julianschuler/MCP23S08__;!!AcCyiFYNC0XOnw!jbcd5AeVNrmmFtmLXER4SJWqreVNNO_dh3wvCr2T5CMJ8Mr5AS8-vw94Tt3JqMSLGUwTBLHy43z5vpxHzUmTfO7Qm3c$ 
 #include <SparkFunBME280.h>                                                               // from Sparkfun under BSD License to be found in Arduino library install
 
 // i2c wire.h normally used i2c pins are not availeble on WT32-ETH01 so use other pins for i2c
@@ -45,6 +35,9 @@
 bool cooplight = false;
 bool coopdoor = false;                                    // False is down
 bool coopdoorrunning = false;
+bool doorup = false, doordown = false;            
+bool dooruppin = false, doordownpin = false;
+bool sparepin6 = false;
 
 // MCP23S08 IO expander
 MCP23S08 expander(CS_PIN_MCP23S08);
@@ -143,6 +136,8 @@ void setup()
 
   // Allow the hardware to sort itself out
   delay(1500);
+
+  expander.digitalWriteIO(WALLSOCKET230VAC_PIN, HIGH);
 }
 
 char tempString[8];
@@ -150,17 +145,18 @@ char timeStringBuff[50];
   
 void loop() 
 {
- 
-  if (!client.connected()) 
-  {
-    reconnect();
-  }
+  if (!coopdoorrunning) {
+    if (!client.connected()) 
+    {
+      reconnect();
+    }
   
-  Alarm.delay(0);                                                                                 // call for timealarms to function
+    Alarm.delay(0);                                                                                 // call for timealarms to function
   
-  server.handleClient();
+    server.handleClient();
 
-  client.loop();
+    client.loop();
+  }
 
   if ((timeinfo.tm_hour >= 16) && (timeinfo.tm_hour <= 20) && !cooplight) {
     cooplight=true;
@@ -173,27 +169,49 @@ void loop()
     client.publish("ESP32_Chickencoop/LightChickencoop", "0");
   }
 
-  if ((timeinfo.tm_hour >= 7) && (timeinfo.tm_hour <= 18) && !coopdoor) {
+  if (expander.digitalReadIO(SPARE_DI6_PIN)){
+    sparepin6 = true;
+  }
+  else if (!(expander.digitalReadIO(SPARE_DI6_PIN))){
+    sparepin6 = false;
+  }
+  
+//  Check_inputs();
+
+  dooruppin = expander.digitalReadIO(DOORUP_PIN);
+  doordownpin = expander.digitalReadIO(DOORDOWN_PIN);
+
+//  if ((timeinfo.tm_hour >= 7) && (timeinfo.tm_hour <= 18) && !coopdoor) {
+  if ((timeinfo.tm_sec >= 30) && !coopdoor && !dooruppin && !coopdoorrunning) {
     coopdoor=true;
     digitalWrite(MOTOR_LEFT, HIGH);
+//    client.publish("ESP32_Chickencoop/DoorChickencoopMotorleft", "1");
     coopdoorrunning=true;
-  //  Alarm.alarmOnce(5,  StopDCMotor);                                                            // tijd om DC motor te stoppen in seconden
-    client.publish("ESP32_Chickencoop/DoorChickencoop", "1");
   }
-  else if (((timeinfo.tm_hour < 7) || (timeinfo.tm_hour > 18)) && coopdoor) {
+//  else if (((timeinfo.tm_hour < 7) || (timeinfo.tm_hour > 18)) && coopdoor) {
+  else if ((timeinfo.tm_sec < 30) && coopdoor && !doordownpin && !coopdoorrunning) {
     coopdoor=false;
     digitalWrite(MOTOR_RIGHT, HIGH);
+//    client.publish("ESP32_Chickencoop/DoorChickencoopMotorright", "1");
     coopdoorrunning=true;
-  //  Alarm.alarmOnce(5,  StopDCMotor);                                                            // tijd om DC motor te stoppen in seconden
-    client.publish("ESP32_Chickencoop/DoorChickencoop", "0");
   }
 
-  if ( coopdoorrunning && ( expander.digitalReadIO(DOORUP_PIN) ) && coopdoor) {
+  if ( !sparepin6) {
     digitalWrite(MOTOR_LEFT, LOW);
+	  digitalWrite(MOTOR_RIGHT, LOW);
+    coopdoorrunning=false;
+    }
+  
+  if ( coopdoorrunning && dooruppin && coopdoor) {
+    digitalWrite(MOTOR_LEFT, LOW);
+//    client.publish("ESP32_Chickencoop/DoorChickencoopMotorleft", "0");
+   	client.publish("ESP32_Chickencoop/DoorChickencoop", "1");
     coopdoorrunning=false;
   }
-  if ( coopdoorrunning && ( expander.digitalReadIO(DOORDOWN_PIN) ) && !coopdoor) {
+  if ( coopdoorrunning && doordownpin && !coopdoor) {
     digitalWrite(MOTOR_RIGHT, LOW);
+//    client.publish("ESP32_Chickencoop/DoorChickencoopMotorright", "0");
+	  client.publish("ESP32_Chickencoop/DoorChickencoop", "0");
     coopdoorrunning=false;
   }
 
@@ -210,49 +228,44 @@ void runalarm_15min(){
   client.publish("ESP32_Chickencoop/HumidityChickencoop", tempString);
   dtostrf((BMEsensorCoop.readFloatPressure() / 100.0F), 1, 0, tempString);
   client.publish("ESP32_Chickencoop/PressureChickencoop", tempString); 
-
-  if (cooplight) {
-    client.publish("ESP32_Chickencoop/LightChickencoop", "1");
-  }
-  else {
-    client.publish("ESP32_Chickencoop/LightChickencoop", "0");
-  }
-
-  if (coopdoor) {
-    client.publish("ESP32_Chickencoop/DoorChickencoop", "1");
-  }
-  else {
-    client.publish("ESP32_Chickencoop/DoorChickencoop", "0");
-  }
 }
 
-/*
-void StopDCMotor(){
-  digitalWrite(MOTOR_LEFT, LOW);
-  digitalWrite(MOTOR_RIGHT, LOW);
-}
-
-void toggle_10sec(){
-  if (Toggle_10sec) 
+void Check_inputs() {
+  long start = millis() ;
+  float temp;
+  long debouncing_time = 15; //Debouncing Time in Milliseconds
+  bool current_state1, current_state2 ;
+  bool previous_state1 = expander.digitalReadIO(DOORUP_PIN);
+  bool previous_state2 = expander.digitalReadIO(DOORDOWN_PIN);
+  for( ; millis()-start <= debouncing_time ; )
   {
-    Toggle_10sec=false;
-    expander.digitalWriteIO(LIGHT230VAC_PIN, HIGH);
-    expander.digitalWriteIO(WALLSOCKET230VAC_PIN, HIGH);
-    expander.digitalWriteIO(SPAREOUTPUT_PIN, HIGH);
-    digitalWrite(MOTOR_LEFT, LOW);
-    digitalWrite(MOTOR_RIGHT, HIGH);
+  current_state1 = expander.digitalReadIO(DOORUP_PIN);
+  if (current_state1 && !previous_state1){
+    if (expander.digitalReadIO(DOORUP_PIN)){
+      dooruppin = true;
+	    client.publish("ESP32_Chickencoop/DoorChickencoopup", "1");
+    }
+    else if (!(expander.digitalReadIO(DOORUP_PIN))){
+      dooruppin = false;
+	    client.publish("ESP32_Chickencoop/DoorChickencoopup", "0");
+    }
   }
-  else
-  {
-    Toggle_10sec=true;
-    expander.digitalWriteIO(LIGHT230VAC_PIN, LOW);
-    expander.digitalWriteIO(WALLSOCKET230VAC_PIN, LOW);
-    expander.digitalWriteIO(SPAREOUTPUT_PIN, LOW);
-    digitalWrite(MOTOR_RIGHT, LOW);
-    digitalWrite(MOTOR_LEFT, HIGH);
+  previous_state1 = current_state1 ;
+  current_state2 = expander.digitalReadIO(DOORDOWN_PIN);
+  if (current_state2 && !previous_state2) {
+    if (expander.digitalReadIO(DOORDOWN_PIN)){
+      doordownpin = true;
+	    client.publish("ESP32_Chickencoop/DoorChickencoopdown", "1");
+    }
+    else if (!(expander.digitalReadIO(DOORDOWN_PIN))){
+      doordownpin = false;
+	    client.publish("ESP32_Chickencoop/DoorChickencoopdown", "0");
+    }
+  }
+  previous_state2 = current_state2 ;     
   }
 }
-*/
+
 void reconnect()
 {
   // Loop until we're reconnected
@@ -261,13 +274,13 @@ void reconnect()
     // Attempt to connect
     if (client.connect(ID, "try", "try"))
     {
-      // This is a workaround to address https://github.com/OPEnSLab-OSU/SSLClient/issues/9
+      // This is a workaround to address https://urldefense.com/v3/__https://github.com/OPEnSLab-OSU/SSLClient/issues/9__;!!AcCyiFYNC0XOnw!jbcd5AeVNrmmFtmLXER4SJWqreVNNO_dh3wvCr2T5CMJ8Mr5AS8-vw94Tt3JqMSLGUwTBLHy43z5vpxHzUmTGxF6hEo$ 
       //ethClientSSL.flush();
       // ... and resubscribe
       client.subscribe(subTopic);
       // for loopback testing
       client.subscribe(TOPIC);
-      // This is a workaround to address https://github.com/OPEnSLab-OSU/SSLClient/issues/9
+      // This is a workaround to address https://urldefense.com/v3/__https://github.com/OPEnSLab-OSU/SSLClient/issues/9__;!!AcCyiFYNC0XOnw!jbcd5AeVNrmmFtmLXER4SJWqreVNNO_dh3wvCr2T5CMJ8Mr5AS8-vw94Tt3JqMSLGUwTBLHy43z5vpxHzUmTGxF6hEo$ 
       //ethClientSSL.flush();
     }
     else
@@ -277,12 +290,13 @@ void reconnect()
     }
   }
 }
+
 void handleRoot()
 {
 #define BUFFER_SIZE     1000
   char tempTempC[8],tempHum[8],tempPress[8];
   char temp[BUFFER_SIZE];
-  char templight[4], tempdoor[4];
+  char templight[4], tempdoor[4], tempdooruppin[4], tempdoordownpin[4];
   getLocalTime(&timeinfo);
   strftime(timeStringBuff, sizeof(timeStringBuff), "%A, %B %d %Y %H:%M:%S", &timeinfo);
   dtostrf(BMEsensorCoop.readTempC(), 1, 1, tempTempC);
@@ -301,6 +315,20 @@ void handleRoot()
   }
   else {
     strcpy(tempdoor, "OFF");
+  }
+
+  if (dooruppin) {
+    strcpy(tempdooruppin, "ON");
+  }
+  else {
+    strcpy(tempdooruppin, "OFF");
+  }
+
+  if (doordownpin) {
+    strcpy(tempdoordownpin, "ON");
+  }
+  else {
+    strcpy(tempdoordownpin, "OFF");
   }
 
   int sec = millis() / 1000;
@@ -328,8 +356,10 @@ body { background-color: #cccccc; font-family: Arial, Helvetica, Sans-Serif; Col
 <p>ChickenCoop Temperature(C): %s</p>\
 <p>ChickenCoop Lights %s</p>\
 <p>ChickenCoop Door %s</p>\
+<p>ChickenCoop Doorsensor up %s</p>\
+<p>ChickenCoop Doorsensor down %s</p>\
 </body>\
-</html>", day, hr % 24, min % 60, sec % 60, timeStringBuff,tempHum,tempPress,tempTempC,templight,tempdoor);
+</html>", day, hr % 24, min % 60, sec % 60, timeStringBuff,tempHum,tempPress,tempTempC,templight,tempdoor, tempdooruppin, tempdoordownpin);
 
   server.send(200, F("text/html"), temp);
 }
@@ -353,3 +383,32 @@ void handleNotFound()
 
   server.send(404, F("text/plain"), message);
 }
+
+/*
+int greenTime = 0;
+int redTime = 0;
+
+int timePassed (time) {
+  int diff = 0;
+
+  if (millis() <= time) {
+    diff = (69666 - time) + millis();
+  } else {
+    diff = millis() - time;
+  }
+
+  return diff;
+}
+
+void loop() {
+  if (timePassed (greenTime) >= 2000) {
+    switchGreen();
+    greenTime = millis();
+  }
+
+  if (timePassed (redTime) >= 1000) {
+    switchRed();
+    redTime = millis();
+  }
+}
+*/
