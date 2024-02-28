@@ -169,39 +169,24 @@ void loop()
     client.publish("ESP32_Chickencoop/LightChickencoop", "0");
   }
 
-  if (expander.digitalReadIO(SPARE_DI6_PIN)){
-    sparepin6 = true;
-  }
-  else if (!(expander.digitalReadIO(SPARE_DI6_PIN))){
-    sparepin6 = false;
-  }
-  
-//  Check_inputs();
-
   dooruppin = expander.digitalReadIO(DOORUP_PIN);
   doordownpin = expander.digitalReadIO(DOORDOWN_PIN);
 
-//  if ((timeinfo.tm_hour >= 7) && (timeinfo.tm_hour <= 18) && !coopdoor) {
-  if ((timeinfo.tm_sec >= 30) && !coopdoor && !dooruppin && !coopdoorrunning) {
+  if ((timeinfo.tm_hour >= 7) && (timeinfo.tm_hour <= 18) && !coopdoor && !dooruppin && !coopdoorrunning) {
+//  if ((timeinfo.tm_sec >= 30) && !coopdoor && !dooruppin && !coopdoorrunning) {
     coopdoor=true;
     digitalWrite(MOTOR_LEFT, HIGH);
 //    client.publish("ESP32_Chickencoop/DoorChickencoopMotorleft", "1");
     coopdoorrunning=true;
   }
-//  else if (((timeinfo.tm_hour < 7) || (timeinfo.tm_hour > 18)) && coopdoor) {
-  else if ((timeinfo.tm_sec < 30) && coopdoor && !doordownpin && !coopdoorrunning) {
+  else if (((timeinfo.tm_hour < 7) || (timeinfo.tm_hour > 18)) && coopdoor && !doordownpin && !coopdoorrunning) {
+//  else if ((timeinfo.tm_sec < 30) && coopdoor && !doordownpin && !coopdoorrunning) {
     coopdoor=false;
     digitalWrite(MOTOR_RIGHT, HIGH);
 //    client.publish("ESP32_Chickencoop/DoorChickencoopMotorright", "1");
     coopdoorrunning=true;
   }
 
-  if ( !sparepin6) {
-    digitalWrite(MOTOR_LEFT, LOW);
-	  digitalWrite(MOTOR_RIGHT, LOW);
-    coopdoorrunning=false;
-    }
-  
   if ( coopdoorrunning && dooruppin && coopdoor) {
     digitalWrite(MOTOR_LEFT, LOW);
 //    client.publish("ESP32_Chickencoop/DoorChickencoopMotorleft", "0");
@@ -214,7 +199,6 @@ void loop()
 	  client.publish("ESP32_Chickencoop/DoorChickencoop", "0");
     coopdoorrunning=false;
   }
-
 }
 
 void runalarm_15min(){
@@ -228,42 +212,6 @@ void runalarm_15min(){
   client.publish("ESP32_Chickencoop/HumidityChickencoop", tempString);
   dtostrf((BMEsensorCoop.readFloatPressure() / 100.0F), 1, 0, tempString);
   client.publish("ESP32_Chickencoop/PressureChickencoop", tempString); 
-}
-
-void Check_inputs() {
-  long start = millis() ;
-  float temp;
-  long debouncing_time = 15; //Debouncing Time in Milliseconds
-  bool current_state1, current_state2 ;
-  bool previous_state1 = expander.digitalReadIO(DOORUP_PIN);
-  bool previous_state2 = expander.digitalReadIO(DOORDOWN_PIN);
-  for( ; millis()-start <= debouncing_time ; )
-  {
-  current_state1 = expander.digitalReadIO(DOORUP_PIN);
-  if (current_state1 && !previous_state1){
-    if (expander.digitalReadIO(DOORUP_PIN)){
-      dooruppin = true;
-	    client.publish("ESP32_Chickencoop/DoorChickencoopup", "1");
-    }
-    else if (!(expander.digitalReadIO(DOORUP_PIN))){
-      dooruppin = false;
-	    client.publish("ESP32_Chickencoop/DoorChickencoopup", "0");
-    }
-  }
-  previous_state1 = current_state1 ;
-  current_state2 = expander.digitalReadIO(DOORDOWN_PIN);
-  if (current_state2 && !previous_state2) {
-    if (expander.digitalReadIO(DOORDOWN_PIN)){
-      doordownpin = true;
-	    client.publish("ESP32_Chickencoop/DoorChickencoopdown", "1");
-    }
-    else if (!(expander.digitalReadIO(DOORDOWN_PIN))){
-      doordownpin = false;
-	    client.publish("ESP32_Chickencoop/DoorChickencoopdown", "0");
-    }
-  }
-  previous_state2 = current_state2 ;     
-  }
 }
 
 void reconnect()
