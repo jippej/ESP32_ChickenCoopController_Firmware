@@ -172,30 +172,24 @@ void loop()
   dooruppin = expander.digitalReadIO(DOORUP_PIN);
   doordownpin = expander.digitalReadIO(DOORDOWN_PIN);
 
-  if ((timeinfo.tm_hour >= 7) && (timeinfo.tm_hour <= 19) && !coopdoor && !dooruppin && !coopdoorrunning) {
-//  if ((timeinfo.tm_sec >= 30) && !coopdoor && !dooruppin && !coopdoorrunning) {
+  if ((timeinfo.tm_hour >= 7) && (timeinfo.tm_hour <= 18) && !coopdoor && !dooruppin && !coopdoorrunning) {
     coopdoor=true;
     digitalWrite(MOTOR_LEFT, HIGH);
-//    client.publish("ESP32_Chickencoop/DoorChickencoopMotorleft", "1");
     coopdoorrunning=true;
   }
-  else if (((timeinfo.tm_hour < 7) || (timeinfo.tm_hour > 19)) && coopdoor && !doordownpin && !coopdoorrunning) {
-//  else if ((timeinfo.tm_sec < 30) && coopdoor && !doordownpin && !coopdoorrunning) {
+  else if (((timeinfo.tm_hour < 7) || (timeinfo.tm_hour > 18)) && coopdoor && !doordownpin && !coopdoorrunning) {
     coopdoor=false;
     digitalWrite(MOTOR_RIGHT, HIGH);
-//    client.publish("ESP32_Chickencoop/DoorChickencoopMotorright", "1");
     coopdoorrunning=true;
   }
 
   if ( coopdoorrunning && dooruppin && coopdoor) {
     digitalWrite(MOTOR_LEFT, LOW);
-//    client.publish("ESP32_Chickencoop/DoorChickencoopMotorleft", "0");
    	client.publish("ESP32_Chickencoop/DoorChickencoop", "1");
     coopdoorrunning=false;
   }
   if ( coopdoorrunning && doordownpin && !coopdoor) {
     digitalWrite(MOTOR_RIGHT, LOW);
-//    client.publish("ESP32_Chickencoop/DoorChickencoopMotorright", "0");
 	  client.publish("ESP32_Chickencoop/DoorChickencoop", "0");
     coopdoorrunning=false;
   }
