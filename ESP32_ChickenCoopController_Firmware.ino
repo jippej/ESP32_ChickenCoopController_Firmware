@@ -172,14 +172,14 @@ void loop()
   dooruppin = expander.digitalReadIO(DOORUP_PIN);
   doordownpin = expander.digitalReadIO(DOORDOWN_PIN);
 
-  if ((timeinfo.tm_hour >= 7) && (timeinfo.tm_hour <= 18) && !coopdoor && !dooruppin && !coopdoorrunning) {
+  if ((timeinfo.tm_hour >= 7) && (timeinfo.tm_hour <= 19) && !coopdoor && !dooruppin && !coopdoorrunning) {
 //  if ((timeinfo.tm_sec >= 30) && !coopdoor && !dooruppin && !coopdoorrunning) {
     coopdoor=true;
     digitalWrite(MOTOR_LEFT, HIGH);
 //    client.publish("ESP32_Chickencoop/DoorChickencoopMotorleft", "1");
     coopdoorrunning=true;
   }
-  else if (((timeinfo.tm_hour < 7) || (timeinfo.tm_hour > 18)) && coopdoor && !doordownpin && !coopdoorrunning) {
+  else if (((timeinfo.tm_hour < 7) || (timeinfo.tm_hour > 19)) && coopdoor && !doordownpin && !coopdoorrunning) {
 //  else if ((timeinfo.tm_sec < 30) && coopdoor && !doordownpin && !coopdoorrunning) {
     coopdoor=false;
     digitalWrite(MOTOR_RIGHT, HIGH);
@@ -331,32 +331,3 @@ void handleNotFound()
 
   server.send(404, F("text/plain"), message);
 }
-
-/*
-int greenTime = 0;
-int redTime = 0;
-
-int timePassed (time) {
-  int diff = 0;
-
-  if (millis() <= time) {
-    diff = (69666 - time) + millis();
-  } else {
-    diff = millis() - time;
-  }
-
-  return diff;
-}
-
-void loop() {
-  if (timePassed (greenTime) >= 2000) {
-    switchGreen();
-    greenTime = millis();
-  }
-
-  if (timePassed (redTime) >= 1000) {
-    switchRed();
-    redTime = millis();
-  }
-}
-*/
